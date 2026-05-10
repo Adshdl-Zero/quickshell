@@ -17,15 +17,41 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    WlrLayershell.exclusiveZone: Theme.barHeight
+    WlrLayershell.exclusiveZone: fullscreenActive ? 0 : Theme.barHeight
 
     color: "transparent"
 
+    visible: !fullscreenActive
+
     mask: Region {
-        item: null
+        item: bar
     }
 
+    property bool fullscreenActive: false
     property int workspace: 1
+
+    Process {
+        id: fullscreenProc
+        command: [
+            "sh",
+            "-c",
+            "hyprctl activewindow -j 2>/dev/null | python3 -c 'import sys,json; s=sys.stdin.read().strip(); print(\"false\" if not s else (\"true\" if (lambda d: d.get(\"fullscreenMode\",0) or d.get(\"fullscreen\", False) or d.get(\"state\",\"\") == \"fullscreen\")(json.loads(s)) else \"false\"))'"
+        ]
+
+        stdout: SplitParser {
+            onRead: function(line) {
+                fullscreenActive = line.trim() === "true"
+            }
+        }
+    }
+
+    Timer {
+        interval: 200
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: fullscreenProc.running = true
+    }
 
     Process {
         id: workspaceProc
@@ -58,6 +84,8 @@ PanelWindow {
     BorderCanvas {}
 
     Bar {
+        id: bar
         workspace: root.workspace
     }
 }
+
